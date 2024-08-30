@@ -16,9 +16,18 @@ import { collection, addDoc } from "firebase/firestore";
 
 const LandingPage = () => {
   const [email, setEmail] = useState("");
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!email) {
+      setError('Please enter a valid email address.');
+      return;
+    }
 
     try {
       // Add the email to the "emails" collection in Firestore
@@ -26,11 +35,11 @@ const LandingPage = () => {
         email: email,
         timestamp: new Date(),
       });
-      alert("Thank you for joining! We have received your email.");
-      setEmail(""); // Clear the input field
+      setSuccess('You have been added to the waitlist!');
+      setEmail(''); // Clear the input field
     } catch (error) {
+      setError('An error occurred. Please try again.');
       console.error("Error adding document: ", error);
-      alert("Failed to submit email. Please try again later.");
     }
   };
 
@@ -114,6 +123,8 @@ const LandingPage = () => {
               Join Now
             </motion.button>
           </motion.form>
+          {error && <p className="text-red-500 mt-4">{error}</p>}
+          {success && <p className="text-green-500 mt-4">{success}</p>}
         </div>
       </section>
 
