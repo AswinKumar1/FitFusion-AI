@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "FitFusion-AI",
-  description: "Your next step towards Fitness powered by AI.",
+  title: "FitFusion",
+  description: "Fitness Revolutionized by AI.",
 };
 
 export default function RootLayout({
