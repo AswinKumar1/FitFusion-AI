@@ -1,7 +1,8 @@
+// firebase-client.js
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-// import { getAnalytics } from "firebase/analytics";
+import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,7 +16,10 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize services
 const db = getFirestore(app);
 const auth = getAuth(app);
+const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null; // Ensure Analytics is only initialized on the client
 
-export { db, auth };
+export { db, auth, analytics };
