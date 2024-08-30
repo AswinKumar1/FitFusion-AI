@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "FitFusion",
-  description: "Fitness Revolutionized by AI.",
+  description: "FitFusion: Where AI meets your fitness goals. Transform your workouts, track progress, and stay motivated—revolutionize the way you train!",
 };
 
 export default function RootLayout({
