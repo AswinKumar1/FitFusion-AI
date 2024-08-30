@@ -1,7 +1,7 @@
 // app/components/LandingPage.js
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import {
   ArrowRight,
@@ -10,14 +10,39 @@ import {
   Award,
   BarChart2,
   Users,
-} from "lucide-react"; // Import all needed icons
-import { db } from "../Firebase"; // Import the db from firebase.js
-import { collection, addDoc } from "firebase/firestore";
+} from "lucide-react";
+import { db, analytics } from "../Firebase";
+import { collection, addDoc, doc, getDoc, setDoc, increment } from "firebase/firestore";
 
 const LandingPage = () => {
   const [email, setEmail] = useState("");
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    const trackVisit = async () => {
+      const visitorId = localStorage.getItem('visitorId');
+      if (!visitorId) {
+        // New visitor
+        const newVisitorId = Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('visitorId', newVisitorId);
+        
+        // Increment total visits
+        const statsRef = doc(db, 'stats', 'visits');
+        await setDoc(statsRef, { count: increment(1) }, { merge: true });
+        
+        // Add new unique visitor
+        const uniqueVisitorsRef = doc(db, 'stats', 'uniqueVisitors');
+        await setDoc(uniqueVisitorsRef, { count: increment(1) }, { merge: true });
+      } else {
+        // Returning visitor, just increment total visits
+        const statsRef = doc(db, 'stats', 'visits');
+        await setDoc(statsRef, { count: increment(1) }, { merge: true });
+      }
+    };
+
+    trackVisit();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,13 +55,12 @@ const LandingPage = () => {
     }
 
     try {
-      // Add the email to the "emails" collection in Firestore
       await addDoc(collection(db, "emails"), {
         email: email,
         timestamp: new Date(),
       });
       setSuccess('You have been added to the waitlist!');
-      setEmail(''); // Clear the input field
+      setEmail('');
     } catch (error) {
       setError('An error occurred. Please try again.');
       console.error("Error adding document: ", error);
