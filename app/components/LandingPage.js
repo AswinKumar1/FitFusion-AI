@@ -58,13 +58,13 @@ const LandingPage = () => {
     setFitnessRegimen(["Generating your personalized fitness regimen..."]);
 
     // Log the API key (first few characters) for debugging
-    console.log("API Key (first 5 chars):", process.env.NEXT_PUBLIC_OPENROUTER_API_KEY?.slice(0, 5));
+    console.log("API Key (first 5 chars):", process.env.OPENROUTER_API_KEY?.slice(0, 5));
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "HTTP-Referer": typeof window !== 'undefined' ? window.location.origin : '',
         "X-Title": "Fitness Regimen Generator"
       },
