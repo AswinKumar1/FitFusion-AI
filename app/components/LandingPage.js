@@ -1,8 +1,7 @@
-// app/components/LandingPage.js
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { motion, useMotionValue, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowRight,
   ChevronDown,
@@ -11,62 +10,97 @@ import {
   BarChart2,
   Users,
 } from "lucide-react";
-import { db, analytics } from "../Firebase";
-import { collection, addDoc, doc, getDoc, setDoc, increment } from "firebase/firestore";
+import { db } from "../Firebase";
+import { collection, addDoc } from "firebase/firestore";
 
 const LandingPage = () => {
   const [email, setEmail] = useState("");
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    age: "",
+    sex: "",
+    weight: "",
+    height: "",
+    goal: "",
+  });
+  const [fitnessRegimen, setFitnessRegimen] = useState(null);
+  const formRef = useRef(null);
 
   useEffect(() => {
-    const trackVisit = async () => {
-      const visitorId = localStorage.getItem('visitorId');
-      if (!visitorId) {
-        // New visitor
-        const newVisitorId = Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('visitorId', newVisitorId);
-        
-        // Increment total visits
-        const statsRef = doc(db, 'stats', 'visits');
-        await setDoc(statsRef, { count: increment(1) }, { merge: true });
-        
-        // Add new unique visitor
-        const uniqueVisitorsRef = doc(db, 'stats', 'uniqueVisitors');
-        await setDoc(uniqueVisitorsRef, { count: increment(1) }, { merge: true });
-      } else {
-        // Returning visitor, just increment total visits
-        const statsRef = doc(db, 'stats', 'visits');
-        await setDoc(statsRef, { count: increment(1) }, { merge: true });
-      }
-    };
-
-    trackVisit();
-  }, []);
+    if (showForm) {
+      formRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [showForm]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
-    if (!email) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-
     try {
       await addDoc(collection(db, "emails"), {
-        email: email,
+        email,
         timestamp: new Date(),
       });
-      setSuccess('You have been added to the waitlist!');
-      setEmail('');
+      setShowForm(true);
     } catch (error) {
-      setError('An error occurred. Please try again.');
-      console.error("Error adding document: ", error);
+      console.error("Error adding email: ", error);
+      alert("Failed to submit email. Please try again later.");
     }
   };
 
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, "users"), {
+        ...formData,
+        email,
+        timestamp: new Date(),
+      });
+
+      setFitnessRegimen(["Generating your personalized fitness regimen..."]);
+
+      const response = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
+            // "HTTP-Referer": `${process.env.NEXT_PUBLIC_APP_URL}`, // Your website URL
+            "X-Title": "Fitness Regimen Generator", // Optional, for OpenRouter's analytics
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-3.5-turbo", // You can change this to other available models
+            messages: [
+              {
+                role: "system",
+                content: "You are a personal fitness training assistant",
+              },
+              {
+                role: "user",
+                content: `Generate a personalized fitness regimen for me with the following details: Age: ${formData.age}, Sex: ${formData.sex}, Weight: ${formData.weight}, Height: ${formData.height}, Fitness Goal: ${formData.goal}.`,
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const text =
+        data.choices[0]?.message.content.trim() || "No regimen found.";
+      const generatedRegimens = text
+        .split("\n")
+        .filter((regimen) => regimen.trim().length > 0);
+      setFitnessRegimen(generatedRegimens);
+    } catch (error) {
+      console.error("Error generating fitness regimen: ", error);
+      setFitnessRegimen([
+        "Failed to generate fitness regimen. Please try again later.",
+      ]);
+    }
+  };
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
       {/* Hero Section */}
@@ -89,9 +123,12 @@ const LandingPage = () => {
             AI • NFTs • Analytics • Community
           </motion.p>
           <motion.button
-            className="bg-purple-600 text-white font-bold py-4 px-10 rounded-full text-xl hover:bg-purple-700 transition duration-300 flex items-center mx-auto"
+            className="bg-green-600 text-white font-bold py-4 px-10 rounded-full text-xl hover:bg-green-700 transition duration-300 flex items-center mx-auto"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              setShowForm(true);
+            }}
           >
             Join the Revolution <ArrowRight className="ml-2" />
           </motion.button>
@@ -111,169 +148,134 @@ const LandingPage = () => {
           <h2 className="text-5xl font-bold text-center mb-16">
             Experience the Future
           </h2>
-          <InteractiveFeatures />
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-b from-purple-900 to-black">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-6xl font-bold mb-6">Ready to Transform?</h2>
-          <p className="text-2xl mb-10">
-            Join our exclusive waitlist and be the first to experience the
-            future of fitness
-          </p>
-          <motion.form
-            onSubmit={handleSubmit}
-            className="max-w-lg mx-auto flex flex-col sm:flex-row items-center"
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full sm:w-2/3 px-6 py-4 rounded-full text-gray-900 mb-4 sm:mb-0 sm:mr-4 bg-white bg-opacity-20 backdrop-filter backdrop-blur-lg"
-              required
-            />
-            <motion.button
-              type="submit"
-              className="w-full sm:w-auto bg-purple-600 text-white font-bold py-4 px-10 rounded-full hover:bg-purple-700 transition duration-300"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Join Now
-            </motion.button>
-          </motion.form>
-          {error && <p className="text-red-500 mt-4">{error}</p>}
-          {success && <p className="text-green-500 mt-4">{success}</p>}
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-black text-white py-10">
-        <div className="container mx-auto px-4 text-center">
-          <p>&copy; 2024 Your Fitness App. All rights reserved.</p>
-          <div className="mt-4">
-            <a href="#" className="text-gray-400 hover:text-white mx-2">
-              Privacy Policy
-            </a>
-            <a href="#" className="text-gray-400 hover:text-white mx-2">
-              Terms of Service
-            </a>
-            <a href="#" className="text-gray-400 hover:text-white mx-2">
-              Contact Us
-            </a>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="text-center">
+              <Zap size={60} className="mx-auto text-green-600" />
+              <h3 className="text-xl font-bold mt-4">AI-Powered Workouts</h3>
+              <p className="mt-2 text-gray-400">
+                Get personalized workout plans powered by AI.
+              </p>
+            </div>
+            <div className="text-center">
+              <Award size={60} className="mx-auto text-green-600" />
+              <h3 className="text-xl font-bold mt-4">NFT Integration</h3>
+              <p className="mt-2 text-gray-400">
+                Unlock unique NFTs as you progress in your fitness journey.
+              </p>
+            </div>
+            <div className="text-center">
+              <BarChart2 size={60} className="mx-auto text-green-600" />
+              <h3 className="text-xl font-bold mt-4">Analytics Dashboard</h3>
+              <p className="mt-2 text-gray-400">
+                Track your performance with advanced analytics.
+              </p>
+            </div>
+            <div className="text-center">
+              <Users size={60} className="mx-auto text-green-600" />
+              <h3 className="text-xl font-bold mt-4">Community Support</h3>
+              <p className="mt-2 text-gray-400">
+                Join a community of like-minded fitness enthusiasts.
+              </p>
+            </div>
           </div>
         </div>
-      </footer>
+      </section>
+
+      {/* Form for Collecting User Details */}
+      {showForm && (
+        <section
+          ref={formRef}
+          className="py-20 bg-gradient-to-b from-purple-900 to-black"
+        >
+          <div className="container mx-auto px-4">
+            <h2 className="text-6xl font-bold mb-6 text-center">
+              Provide Your Details
+            </h2>
+            <form
+              onSubmit={handleFormSubmit}
+              className="max-w-lg mx-auto bg-gray-800 p-8 rounded-lg"
+            >
+              <div className="mb-4">
+                <label className="block text-gray-300 mb-2">Age</label>
+                <input
+                  type="number"
+                  name="age"
+                  value={formData.age}
+                  onChange={(e) =>
+                    setFormData({ ...formData, age: e.target.value })
+                  }
+                  className="w-full p-3 rounded bg-gray-700 text-white"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-300 mb-2">Sex</label>
+                <input
+                  type="text"
+                  name="sex"
+                  value={formData.sex}
+                  onChange={(e) =>
+                    setFormData({ ...formData, sex: e.target.value })
+                  }
+                  className="w-full p-3 rounded bg-gray-700 text-white"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-300 mb-2">Weight (kg)</label>
+                <input
+                  type="number"
+                  name="weight"
+                  value={formData.weight}
+                  onChange={(e) =>
+                    setFormData({ ...formData, weight: e.target.value })
+                  }
+                  className="w-full p-3 rounded bg-gray-700 text-white"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-300 mb-2">Height (cm)</label>
+                <input
+                  type="number"
+                  name="height"
+                  value={formData.height}
+                  onChange={(e) =>
+                    setFormData({ ...formData, height: e.target.value })
+                  }
+                  className="w-full p-3 rounded bg-gray-700 text-white"
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-gray-300 mb-2">Fitness Goal</label>
+                <input
+                  type="text"
+                  name="goal"
+                  value={formData.goal}
+                  onChange={(e) =>
+                    setFormData({ ...formData, goal: e.target.value })
+                  }
+                  className="w-full p-3 rounded bg-gray-700 text-white"
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-green-600 text-white font-bold py-4 px-8 rounded-full text-xl hover:bg-green-700 transition duration-300 w-full"
+              >
+                Generate Regimen
+              </button>
+            </form>
+            {fitnessRegimen && (
+              <div className="mt-10 bg-gray-800 p-8 rounded-lg">
+                <h3 className="text-2xl font-bold mb-4">Your Regimen:</h3>
+                <ul className="list-disc list-inside text-gray-300">
+                  {fitnessRegimen.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
-  );
-};
-
-const InteractiveFeatures = () => {
-  const features = [
-    {
-      icon: <Zap size={40} />,
-      title: "AI Chatbot",
-      description: "24/7 personalized workout advice",
-    },
-    {
-      icon: <Award size={40} />,
-      title: "NFT Rewards",
-      description: "Earn unique digital assets",
-    },
-    {
-      icon: <BarChart2 size={40} />,
-      title: "Analytics",
-      description: "Visualize your progress in real-time",
-    },
-    {
-      icon: <Users size={40} />,
-      title: "Community",
-      description: "Connect with fitness enthusiasts",
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-      {features.map((feature, index) => (
-        <FeatureCard key={index} feature={feature} />
-      ))}
-    </div>
-  );
-};
-
-const FeatureCard = ({ feature }) => {
-  const ref = useRef(null);
-  const [hovered, setHovered] = useState(false);
-
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-
-  const rotateX = useTransform(y, [-300, 300], [30, -30]);
-  const rotateY = useTransform(x, [-300, 300], [-30, 30]);
-
-  const handleMouseMove = (event) => {
-    const rect = ref.current.getBoundingClientRect();
-    x.set(event.clientX - rect.left - rect.width / 2);
-    y.set(event.clientY - rect.top - rect.height / 2);
-  };
-
-  const handleMouseLeave = () => {
-    x.set(0);
-    y.set(0);
-  };
-
-  return (
-    <motion.div
-      ref={ref}
-      className="relative h-96 rounded-2xl overflow-hidden cursor-pointer perspective-1000"
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
-      style={{
-        rotateX,
-        rotateY,
-        transformStyle: "preserve-3d",
-      }}
-    >
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-br from-purple-700 to-pink-600 rounded-2xl"
-        style={{ z: -1 }}
-        animate={{ scale: hovered ? 1.05 : 1 }}
-      />
-      <motion.div
-        className="absolute inset-1 bg-gray-900 rounded-2xl flex flex-col items-center justify-center p-8 text-center"
-        style={{ z: 1, transformStyle: "preserve-3d" }}
-      >
-        <motion.div
-          className="text-purple-400 mb-6"
-          style={{ z: 50 }}
-          animate={{ rotateY: hovered ? 360 : 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          {feature.icon}
-        </motion.div>
-        <motion.h3
-          className="text-3xl font-semibold mb-4"
-          style={{ z: 30 }}
-          animate={{ y: hovered ? -10 : 0 }}
-        >
-          {feature.title}
-        </motion.h3>
-        <motion.p
-          className="text-gray-300"
-          style={{ z: 20 }}
-          animate={{ opacity: hovered ? 1 : 0.8 }}
-        >
-          {feature.description}
-        </motion.p>
-      </motion.div>
-    </motion.div>
   );
 };
 
