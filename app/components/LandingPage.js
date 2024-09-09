@@ -47,60 +47,60 @@ const LandingPage = () => {
   };
 
   const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await addDoc(collection(db, "users"), {
-        ...formData,
-        email,
-        timestamp: new Date(),
-      });
+  e.preventDefault();
+  try {
+    await addDoc(collection(db, "users"), {
+      ...formData,
+      email,
+      timestamp: new Date(),
+    });
 
-      setFitnessRegimen(["Generating your personalized fitness regimen..."]);
+    setFitnessRegimen(["Generating your personalized fitness regimen..."]);
 
-      const response = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
-            // "HTTP-Referer": `${process.env.NEXT_PUBLIC_APP_URL}`, // Your website URL
-            "X-Title": "Fitness Regimen Generator", // Optional, for OpenRouter's analytics
+    // Log the API key (first few characters) for debugging
+    console.log("API Key (first 5 chars):", process.env.NEXT_PUBLIC_OPENROUTER_API_KEY?.slice(0, 5));
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
+        "HTTP-Referer": typeof window !== 'undefined' ? window.location.origin : '',
+        "X-Title": "Fitness Regimen Generator"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You are a personal fitness training assistant"
           },
-          body: JSON.stringify({
-            model: "openai/gpt-3.5-turbo", // You can change this to other available models
-            messages: [
-              {
-                role: "system",
-                content: "You are a personal fitness training assistant",
-              },
-              {
-                role: "user",
-                content: `Generate a personalized fitness regimen for me with the following details: Age: ${formData.age}, Sex: ${formData.sex}, Weight: ${formData.weight}, Height: ${formData.height}, Fitness Goal: ${formData.goal}.`,
-              },
-            ],
-          }),
-        }
-      );
+          {
+            role: "user",
+            content: `Generate a personalized fitness regimen for me with the following details: Age: ${formData.age}, Sex: ${formData.sex}, Weight: ${formData.weight}, Height: ${formData.height}, Fitness Goal: ${formData.goal}.`
+          }
+        ]
+      })
+    });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const text =
-        data.choices[0]?.message.content.trim() || "No regimen found.";
-      const generatedRegimens = text
-        .split("\n")
-        .filter((regimen) => regimen.trim().length > 0);
-      setFitnessRegimen(generatedRegimens);
-    } catch (error) {
-      console.error("Error generating fitness regimen: ", error);
-      setFitnessRegimen([
-        "Failed to generate fitness regimen. Please try again later.",
-      ]);
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error("API Error Response:", errorBody);
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorBody}`);
     }
-  };
+
+    const data = await response.json();
+    const text = data.choices[0]?.message.content.trim() || "No regimen found.";
+    const generatedRegimens = text
+      .split("\n")
+      .filter((regimen) => regimen.trim().length > 0);
+    setFitnessRegimen(generatedRegimens);
+
+  } catch (error) {
+    console.error("Error generating fitness regimen: ", error);
+    setFitnessRegimen(["Failed to generate fitness regimen. Please try again later."]);
+  }
+};
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden">
       {/* Hero Section */}
